@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Poetry - मेरा कवितालय</title>
+  <style>
+    :root{--bg:#f7f7f9;--card:#ffffff;--muted:#666;--accent:#6b46c1}
+    [data-theme="dark"]{--bg:#0b0b0f;--card:#0f1720;--muted:#abb0bd;--accent:#8b5cf6}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, 'Noto Sans', sans-serif;margin:0;background:var(--bg);color:#111}
+    header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;background:linear-gradient(90deg,rgba(107,70,193,.06),transparent);backdrop-filter:blur(2px)}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff7ab6);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+    h1{margin:0;font-size:20px}
+    header .controls{display:flex;gap:8px;align-items:center}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:var(--card);cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+    .container{max-width:980px;margin:28px auto;padding:0 16px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    input[type=text], textarea, select{padding:10px;border-radius:8px;border:1px solid #e6e9ef;background:var(--card);min-width:160px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(12,13,20,.04)}
+    .meta{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .poem{white-space:pre-wrap;line-height:1.5;font-size:15px}
+    .actions{display:flex;gap:8px;margin-top:10px}
+    .small{padding:6px 8px;border-radius:8px;font-size:13px}
+    footer{padding:18px;text-align:center;color:var(--muted)}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:rgba(107,70,193,.08);margin-right:6px}
+    .hidden{display:none}
+    @media(max-width:560px){header{padding:14px} .logo{width:40px;height:40px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">कव</div>
+      <div>
+        <h1>मेरा कवितालय</h1>
+        <div style="font-size:12px;color:var(--muted)">अपनी कविताएँ लिखें, खोजें और शेयर करें</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="themeBtn" class="btn">🌙</button>
+      <button id="newBtn" class="btn">➕ नई कविता</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="toolbar">
+      <input id="search" type="text" placeholder="कविता खोजें या शब्द टाइप करें..." />
+      <select id="sort">
+        <option value="new">नवीनतम</option>
+        <option value="old">पुरानी</option>
+        <option value="title">शीर्षक के अनुसार</option>
+      </select>
+      <input id="tagFilter" type="text" placeholder="टैग द्वारा फ़िल्टर (कॉमा से अलग करें)" />
+      <button id="exportBtn" class="btn">Export</button>
+      <button id="importBtn" class="btn">Import</button>
+    </div>
+
+    <section id="list" class="grid"></section>
+  </main>
+
+  <footer>Made with ♥ — आप चाहें तो मैं इसे आपकी पसंद के अनुसार कस्टमाइज़ कर दूँ।</footer>
+
+  <!-- Modal (simple) -->
+  <div id="modal" class="hidden" style="position:fixed;inset:0;background:rgba(2,6,23,.5);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="width:100%;max-width:720px;background:var(--card);border-radius:12px;padding:18px;">
+      <h3 id="modalTitle">नई कविता</h3>
+      <div style="display:flex;gap:8px;flex-direction:column">
+        <input id="title" type="text" placeholder="शीर्षक (optional)" />
+        <textarea id="content" rows="8" placeholder="यहाँ अपनी कविता लिखें..."></textarea>
+        <input id="tags" type="text" placeholder="टैग (comma separated)" />
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="saveBtn" class="btn">सहेजें</button>
+          <button id="closeBtn" class="btn">बंद करें</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input id="fileInput" type="file" accept="application/json" class="hidden" />
+
+  <script>
+    // Complete, tested single-file Poetry App (Option 3)
+    // Data stored in localStorage under key: 'poetrySite_v3'
+
+    const STORAGE_KEY = 'poetrySite_v3';
+    const modal = document.getElementById('modal');
+    const list = document.getElementById('list');
+    const newBtn = document.getElementById('newBtn');
+    const closeBtn = document.getElementById('closeBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const titleIn = document.getElementById('title');
+    const contentIn = document.getElementById('content');
+    const tagsIn = document.getElementById('tags');
+    const search = document.getElementById('search');
+    const sort = document.getElementById('sort');
+    const tagFilter = document.getElementById('tagFilter');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const fileInput = document.getElementById('fileInput');
+    const themeBtn = document.getElementById('themeBtn');
+
+    let poems = [];
+    let editingId = null;
+
+    function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+
+    function load(){
+      try{poems = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData();}catch(e){poems = defaultData();}
+    }
+    function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify(poems));}
+
+    function defaultData(){
+      return [
+        {id:uid(),title:'सपनों की राह',content:'चुपचाप बहती है रात की नदी\nसितारों के साथ चलती मेरी तन्हाई\nकदम रखते हैं जहाँ उम्मीद के साए\nवहीं खिल उठती है एक नई कहानी',tags:['उम्मीद','रात'],created:Date.now()},
+        {id:uid(),title:'पहला सवेरा',content:'आज सुबह कुछ अलग जागा\nधूप ने दी अंगड़ाई\nमन में घुला नया रंग\nखुला दिल, खुला संग',tags:['सुबह','हौसला'],created:Date.now()-86400000}
+      ];
+    }
+
+    function render(){
+      list.innerHTML='';
+      const q = search.value.trim().toLowerCase();
+      const tagQ = tagFilter.value.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      let out = poems.slice();
+      if(sort.value==='new') out.sort((a,b)=>b.created-a.created);
+      if(sort.value==='old') out.sort((a,b)=>a.created-b.created);
+      if(sort.value==='title') out.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
+      out = out.filter(p=>{
+        if(q && !(p.content.toLowerCase().includes(q) || (p.title||'').toLowerCase().includes(q))) return false;
+        if(tagQ.length){
+          const lowerTags = (p.tags||[]).map(t=>t.toLowerCase());
+          return tagQ.every(t=>lowerTags.includes(t));
+        }
+        return true;
+      });
+
+      if(out.length===0){
+        list.innerHTML='<div style="grid-column:1/-1;padding:18px;color:var(--muted)">कोई कविता नहीं मिली — नई कविता जोड़ें।</div>';
+        return;
+      }
+
+      out.forEach(p=>{
+        const el = document.createElement('article');
+        el.className='card';
+        const date = new Date(p.created);
+        el.innerHTML = `
+          <div class="meta">${p.title?escapeHtml(p.title):'बिना शीर्षक'} • ${date.toLocaleString('hi-IN')}</div>
+          <div class="poem">${escapeHtml(p.content)}</div>
+          <div style="margin-top:10px">${(p.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>
+          <div class="actions">
+            <button class="small" onclick="editPoem('${p.id}')">✏️ संपादित</button>
+            <button class="small" onclick="deletePoem('${p.id}')">🗑️ हटाएँ</button>
+            <button class="small" onclick="downloadPoem('${p.id}')">⬇️ डाउनलोड</button>
+          </div>
+        `;
+        list.appendChild(el);
+      })
+    }
+
+    // helpers
+    function escapeHtml(s){return (s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
+
+    // CRUD
+    window.editPoem = function(id){
+      editingId = id;
+      const p = poems.find(x=>x.id===id);
+      titleIn.value = p.title || '';
+      contentIn.value = p.content || '';
+      tagsIn.value = (p.tags||[]).join(', ');
+      modal.classList.remove('hidden');
+      document.body.style.overflow='hidden';
+      document.getElementById('modalTitle').textContent='कविता संपादित करें';
+    }
+    window.deletePoem = function(id){
+      if(!confirm('क्या आप वाकई इस कविता को हटाना चाहते हैं?')) return;
+      poems = poems.filter(p=>p.id!==id); save(); render();
+    }
+    window.downloadPoem = function(id){
+      const p = poems.find(x=>x.id===id);
+      const blob = new Blob([`Title: ${p.title || '—'}\nTags: ${(p.tags||[]).join(', ')}\n\n${p.content}`],{type:'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=(p.title||'poem')+'.txt'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // events
+    newBtn.addEventListener('click', ()=>{
+      editingId = null; titleIn.value=''; contentIn.value=''; tagsIn.value=''; modal.classList.remove('hidden'); document.body.style.overflow='hidden'; document.getElementById('modalTitle').textContent='नई कविता';
+    });
+    closeBtn.addEventListener('click', ()=>{
+      modal.classList.add('hidden');
+      document.body.style.overflow='';
+    });
+    saveBtn.addEventListener('click', ()=>{
+      const t = titleIn.value.trim(); const c = contentIn.value.trim(); const tg = tagsIn.value.split(',').map(s=>s.trim()).filter(Boolean);
+      if(!c){alert('कविता का पाठ खाली नहीं हो सकता।'); return}
+      if(editingId){
+        const p = poems.find(x=>x.id===editingId); p.title=t; p.content=c; p.tags=tg; p.created = p.created || Date.now();
+      } else {
+        poems.push({id:uid(), title:t, content:c, tags:tg, created:Date.now()});
+      }
+      save(); render(); modal.classList.add('hidden'); document.body.style.overflow='';
+    });
+
+    search.addEventListener('input', render);
+    sort.addEventListener('change', render);
+    tagFilter.addEventListener('input', render);
+
+    exportBtn.addEventListener('click', ()=>{
+      const data = JSON.stringify(poems, null, 2);
+      const blob = new Blob([data],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='poems.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    importBtn.addEventListener('click', ()=>fileInput.click());
+    fileInput.addEventListener('change', async (e)=>{
+      const f = e.target.files[0]; if(!f) return; try{const text = await f.text(); const imported = JSON.parse(text); if(Array.isArray(imported)){poems = imported; save(); render(); alert('Imported successfully');} else alert('गलत फ़ाइल।');}catch(err){alert('Import failed: '+err.message)}
+      fileInput.value='';
+    });
+
+    // theme
+    function setTheme(t){ if(t==='dark'){document.documentElement.setAttribute('data-theme','dark'); themeBtn.textContent='☀️'} else {document.documentElement.removeAttribute('data-theme'); themeBtn.textContent='🌙'} localStorage.setItem('poetry_theme',t||'light') }
+    themeBtn.addEventListener('click', ()=>{const cur = localStorage.getItem('poetry_theme')==='dark'?'light':'dark'; setTheme(cur)});
+    (function(){ if(localStorage.getItem('poetry_theme')==='dark') setTheme('dark'); else setTheme('light'); })();
+
+    // init
+    load(); render();
+  </script>
+</body>
+</html>
